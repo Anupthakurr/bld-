@@ -25,18 +25,40 @@ React UI (canvas) ←─ Socket.IO ──→ Node.js Backend ←─ Puppeteer/CD
 
 ## System Design
 
-### Streaming
-The backend uses CDP's `Page.startScreencast` event — Chromium natively pushes JPEG frames whenever the screen changes. This is far more efficient than polling screenshots. Each frame must be acknowledged with `Page.screencastFrameAck` or the stream pauses.
+This system provides a local, web-based UI that can spin up a headless Chromium instance inside a Docker container, stream its visual output in real-time to a canvas, and proxy user interactions back to the headless browser.
 
-### Input
-Mouse and keyboard events are captured on the canvas, scaled from canvas-space to browser-viewport-space, and sent via Socket.IO to the backend, which replays them via Puppeteer's `page.mouse` and `page.keyboard` APIs.
+### 1. Frontend Layer (React + Vite)
+- **Role:** The client-facing interface that renders the browser view and captures user inputs.
+- **Key Technology:** A `<canvas>` element is used to draw the incoming JPEG frames efficiently.
+- **Real-time Communication:** Connects to the backend via Socket.IO.
+- **Event Handling:** Mouse clicks, movements, scrolling, and keyboard events are intercepted on the canvas. Coordinates are scaled from the canvas dimensions to the target 1280x720 remote viewport dimensions before being transmitted.
 
-### Container Lifecycle
-1. Backend receives `POST /api/browser/start`
-2. `dockerode` builds the image (first run only) then creates and starts the container with port 9222 mapped
-3. Backend polls `http://localhost:9222/json/version` until Chromium's CDP is ready
-4. Puppeteer connects, opens a page, sets 1280×720 viewport, starts screencast
-5. `POST /api/browser/stop` disconnects Puppeteer, stops and removes the container
+### 2. Backend Layer (Node.js + Express)
+- **Role:** The orchestration layer that acts as a bridge between the Web UI and the Chromium instance.
+- **Docker Management:** Uses `dockerode` to programmatically pull the custom image, spawn the container, bind ports, and eventually stop/remove the container.
+- **Browser Control:** Uses `puppeteer-core` to establish a Chrome DevTools Protocol (CDP) session with the Chromium instance running on port 9222.
+- **Screencast Pipeline:** Subscribes to the `Page.screencastFrame` CDP event. As Chromium pushes JPEG frames, the backend forwards them immediately to the frontend via Socket.IO, and acknowledges the frame to Chromium (`Page.screencastFrameAck`) to keep the stream flowing.
+- **Fallback Mechanism:** If the Docker daemon is unreachable on the host system, the backend falls back to spawning a local system Chrome/Edge instance via `puppeteer-core` as a resilient alternative to ensure the UI remains fully testable.
+
+### 3. Container Layer (Docker)
+- **Role:** An isolated, ephemeral environment for the headless browser.
+- **Base Image:** `node:20-slim` is used to keep the footprint relatively small while providing necessary libraries.
+- **Dependencies:** Installs required X11, ALSA, and rendering libraries so Chromium can run headless without crashing.
+- **Configuration:** Exposes port 9222 and binds the remote debugging address to `0.0.0.0` so the host Node.js process can connect to the CDP socket.
+
+### Design Decisions
+
+#### CDP Streaming vs. X11/VNC
+- **Decision:** Use CDP's native `Page.startScreencast`.
+- **Reasoning:** Setting up a full virtual frame buffer (Xvfb) and a VNC server inside Docker is heavy and complex. CDP is already built into Chrome. `Page.startScreencast` is specifically designed for remote debugging and provides a stream of JPEG frames, which is perfect for drawing directly onto an HTML5 Canvas without heavy encoding overhead.
+
+#### Socket.IO for Transport
+- **Decision:** Use Socket.IO over bare WebSockets.
+- **Reasoning:** Socket.IO handles automatic reconnections, binary payloads, and provides an easy event-driven API for multiplexing frames, logs, state updates, and input commands over a single connection.
+
+#### Viewport and Scaling
+- **Decision:** Fixed remote viewport of `1280x720`.
+- **Reasoning:** Ensures consistent rendering regardless of the user's monitor size. The frontend scales the received frames to fit its available window area using CSS and Canvas context scaling, and reverse-scales mouse coordinates back to the `1280x720` space before sending them to the backend to ensure pixel-perfect clicks.
 
 ## Prerequisites
 
