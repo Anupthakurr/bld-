@@ -1,25 +1,25 @@
 export default function StatusBar({ fps, socketConnected, browserState, sessionMode }) {
   const stateColor = {
-    stopped:  'var(--text-muted)',
+    stopped: 'var(--ink-muted)',
     starting: 'var(--warning)',
-    running:  'var(--success)',
+    running: 'var(--success)',
     stopping: 'var(--danger)',
-  }[browserState] || 'var(--text-muted)';
+  }[browserState] || 'var(--ink-muted)';
 
   const stateLabel = {
-    stopped:  'Idle',
-    starting: 'Starting…',
-    running:  'Live',
-    stopping: 'Stopping…',
+    stopped: 'Idle',
+    starting: 'Starting...',
+    running: 'Live',
+    stopping: 'Stopping...',
   }[browserState] || 'Unknown';
 
-  const modeLabel = sessionMode === 'docker' ? '🐳 Docker' : sessionMode === 'local' ? '⚡ Local' : null;
+  const modeLabel = sessionMode === 'docker' ? 'Docker' : sessionMode === 'local' ? 'Local' : null;
 
   return (
     <div className="status-bar">
       <div className="status-item">
         <span>Browser</span>
-        <span style={{ color: stateColor, fontWeight: 600 }}>{stateLabel}</span>
+        <span style={{ color: stateColor, fontWeight: 700 }}>{stateLabel}</span>
       </div>
 
       <div className="status-sep" />
@@ -30,7 +30,7 @@ export default function StatusBar({ fps, socketConnected, browserState, sessionM
             <>
               <div className="status-item">
                 <span>Mode</span>
-                <span style={{ color: sessionMode === 'docker' ? 'var(--accent-primary)' : 'var(--success)' }}>
+                <span style={{ color: sessionMode === 'docker' ? 'var(--accent)' : 'var(--success)' }}>
                   {modeLabel}
                 </span>
               </div>
@@ -39,12 +39,12 @@ export default function StatusBar({ fps, socketConnected, browserState, sessionM
           )}
           <div className="status-item">
             <span>FPS</span>
-            <span>{fps ?? '–'}</span>
+            <span>{fps ?? '-'}</span>
           </div>
           <div className="status-sep" />
           <div className="status-item">
             <span>Viewport</span>
-            <span>1280 × 720</span>
+            <span>1280 x 720</span>
           </div>
           <div className="status-sep" />
         </>

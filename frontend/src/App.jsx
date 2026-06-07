@@ -7,23 +7,22 @@ import StatusBar from './components/StatusBar.jsx';
 const BACKEND_URL = 'http://localhost:3001';
 
 export default function App() {
-  const socketRef     = useRef(null);
-  const logBodyRef    = useRef(null);
+  const socketRef = useRef(null);
+  const logBodyRef = useRef(null);
 
   const [socketConnected, setSocketConnected] = useState(false);
-  const [browserState, setBrowserState]       = useState('stopped');
-  const [sessionMode, setSessionMode]         = useState(null); // 'docker' | 'local'
-  const [currentUrl, setCurrentUrl]           = useState('');
-  const [fps, setFps]                         = useState(null);
-  const [logs, setLogs]                       = useState([]);
-  const [startLogs, setStartLogs]             = useState([]);
+  const [browserState, setBrowserState] = useState('stopped');
+  const [sessionMode, setSessionMode] = useState(null);
+  const [currentUrl, setCurrentUrl] = useState('');
+  const [fps, setFps] = useState(null);
+  const [logs, setLogs] = useState([]);
+  const [startLogs, setStartLogs] = useState([]);
 
   const addLog = useCallback((msg) => {
     const time = new Date().toLocaleTimeString('en', { hour12: false });
-    setLogs(prev => [...prev.slice(-199), { msg, time }]);
+    setLogs((prev) => [...prev.slice(-199), { msg, time }]);
   }, []);
 
-  // ── Socket.IO setup ───────────────────────────────────────────────────────
   useEffect(() => {
     const socket = io(BACKEND_URL, {
       reconnectionAttempts: Infinity,
@@ -54,7 +53,7 @@ export default function App() {
 
     socket.on('browser:ready', ({ mode } = {}) => {
       if (mode) setSessionMode(mode);
-      addLog(`Browser is live!${mode ? ` (${mode} mode)` : ''}`);
+      addLog(`Browser is live${mode ? ` (${mode} mode)` : ''}`);
       setStartLogs([]);
     });
 
@@ -68,20 +67,21 @@ export default function App() {
 
     socket.on('log', ({ message }) => {
       addLog(message);
-      setStartLogs(prev => [...prev.slice(-19), message]);
+      setStartLogs((prev) => [...prev.slice(-19), message]);
     });
 
-    return () => socket.disconnect();
+    return () => {
+      socketRef.current = null;
+      socket.disconnect();
+    };
   }, [addLog]);
 
-  // Auto-scroll log panel
   useEffect(() => {
     if (logBodyRef.current) {
       logBodyRef.current.scrollTop = logBodyRef.current.scrollHeight;
     }
   }, [logs]);
 
-  // ── Browser control ───────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
     try {
       const res = await fetch(`${BACKEND_URL}/api/browser/start`, { method: 'POST' });
@@ -102,61 +102,115 @@ export default function App() {
     }
   }, [addLog]);
 
-  const connStatus  = socketConnected ? 'connected' : 'disconnected';
-  const isActive    = browserState === 'running';
-  const isStarting  = browserState === 'starting';
+  const connStatus = socketConnected ? 'connected' : 'disconnected';
+  const isActive = browserState === 'running';
+  const isStarting = browserState === 'starting';
+  const visibleLogs = logs.slice(-7).reverse();
+
+  const statusText = {
+    stopped: 'Ready to launch',
+    starting: 'Starting Chromium',
+    running: 'Interactive session',
+    stopping: 'Stopping session',
+  }[browserState] || 'Waiting';
 
   return (
     <div className="app">
-      {/* Header */}
       <header className="header">
-        <div className="header-logo">
-          <div className="header-logo-icon">🌐</div>
-          <span className="header-logo-text">BLD Remote Browser</span>
+        <div className="brand-lockup">
+          <div className="brand-mark">BLD</div>
+          <div>
+            <p className="brand-kicker">Remote Browser Control</p>
+            <h1 className="brand-title">Chromium Session Console</h1>
+          </div>
         </div>
 
-        <div className="header-divider" />
-
         <Toolbar
-          socket={socketRef.current}
+          socketRef={socketRef}
           browserState={browserState}
           onStart={handleStart}
           onStop={handleStop}
           currentUrl={currentUrl}
         />
 
-        <div className="header-divider" />
-
-        {/* Connection badge */}
         <div className="conn-badge">
           <div className={`conn-dot ${connStatus}`} />
-          <span>{socketConnected ? 'Live' : 'Offline'}</span>
+          <span>{socketConnected ? 'Backend online' : 'Backend offline'}</span>
         </div>
       </header>
 
-      {/* Main area */}
       <div className="main-content">
+        <aside className="session-panel">
+          <div className="panel-section">
+            <span className="section-label">Session</span>
+            <div className="session-state">
+              <div className={`state-orb ${browserState}`} />
+              <div>
+                <strong>{statusText}</strong>
+                <span>{sessionMode ? `${sessionMode} mode` : 'No container attached'}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="metric-grid">
+            <div className="metric-tile">
+              <span>FPS</span>
+              <strong>{fps ?? '-'}</strong>
+            </div>
+            <div className="metric-tile">
+              <span>Viewport</span>
+              <strong>1280 x 720</strong>
+            </div>
+          </div>
+
+          <div className="panel-section">
+            <span className="section-label">Input Routing</span>
+            <div className="hint-list">
+              <span>Mouse click and movement</span>
+              <span>Wheel scrolling</span>
+              <span>Keyboard focus on canvas</span>
+            </div>
+          </div>
+
+          <div className="panel-section recent-events">
+            <span className="section-label">Recent Events</span>
+            {visibleLogs.length === 0 ? (
+              <p className="empty-note">Events will appear after the backend connects.</p>
+            ) : (
+              visibleLogs.map((entry, i) => (
+                <div className="event-row" key={`${entry.time}-${i}`}>
+                  <span>{entry.time}</span>
+                  <p>{entry.msg}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </aside>
+
         <BrowserViewer
-          socket={socketRef.current}
+          socketRef={socketRef}
+          socketConnected={socketConnected}
           isActive={isActive}
           isStarting={isStarting}
           onStart={handleStart}
           logs={startLogs}
         />
 
-        {/* Side log panel */}
         <aside className="log-panel">
-          <div className="log-panel-header">System Log</div>
+          <div className="log-panel-header">
+            <span>System Log</span>
+            <span>{logs.length} events</span>
+          </div>
           <div className="log-panel-body" ref={logBodyRef}>
             {logs.length === 0 && (
               <div className="log-entry">
-                <span className="log-entry-msg" style={{ color: 'var(--text-muted)' }}>
-                  No events yet…
+                <span className="log-entry-msg" style={{ color: 'var(--ink-muted)' }}>
+                  No events yet.
                 </span>
               </div>
             )}
             {logs.map((entry, i) => (
-              <div key={i} className="log-entry">
+              <div key={`${entry.time}-${i}`} className="log-entry">
                 <span className="log-entry-time">{entry.time}</span>
                 <span className="log-entry-msg">{entry.msg}</span>
               </div>
@@ -165,7 +219,6 @@ export default function App() {
         </aside>
       </div>
 
-      {/* Status bar */}
       <StatusBar
         fps={fps}
         socketConnected={socketConnected}
