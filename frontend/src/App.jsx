@@ -12,6 +12,7 @@ export default function App() {
 
   const [socketConnected, setSocketConnected] = useState(false);
   const [browserState, setBrowserState]       = useState('stopped');
+  const [sessionMode, setSessionMode]         = useState(null); // 'docker' | 'local'
   const [currentUrl, setCurrentUrl]           = useState('');
   const [fps, setFps]                         = useState(null);
   const [logs, setLogs]                       = useState([]);
@@ -40,17 +41,20 @@ export default function App() {
       addLog('Disconnected from backend');
     });
 
-    socket.on('browser:state', ({ state }) => {
+    socket.on('browser:state', ({ state, mode }) => {
       setBrowserState(state);
+      if (mode !== undefined) setSessionMode(mode);
       if (state === 'stopped') {
         setCurrentUrl('');
         setFps(null);
         setStartLogs([]);
+        setSessionMode(null);
       }
     });
 
-    socket.on('browser:ready', () => {
-      addLog('Browser is live!');
+    socket.on('browser:ready', ({ mode } = {}) => {
+      if (mode) setSessionMode(mode);
+      addLog(`Browser is live!${mode ? ` (${mode} mode)` : ''}`);
       setStartLogs([]);
     });
 
@@ -166,7 +170,7 @@ export default function App() {
         fps={fps}
         socketConnected={socketConnected}
         browserState={browserState}
-        frameLatency={null}
+        sessionMode={sessionMode}
       />
     </div>
   );
