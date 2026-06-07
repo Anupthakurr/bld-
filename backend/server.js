@@ -108,6 +108,7 @@ async function startBrowser() {
     io.emit('browser:ready', { ...browserSession.viewportSize, mode: 'local' });
   } catch (localErr) {
     broadcastLog(`Local Chromium also failed: ${localErr.message}`);
+    console.error('LOCAL FALLBACK ERROR:', localErr);
     browserSession = null;
     setState('stopped');
     throw localErr;
