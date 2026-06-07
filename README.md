@@ -115,3 +115,19 @@ bld/
 │   └── package.json
 └── README.md
 ```
+
+## Production Deployment Strategy
+
+While this system is designed to run locally for the assignment, deploying it to production requires a specific architecture due to its reliance on Docker daemon access.
+
+1. **Frontend (Static Hosting)**
+   - The React frontend can be built (`npm run build`) and hosted on any static site CDN such as **Vercel, Netlify, or Cloudflare Pages**.
+
+2. **Backend (Virtual Private Server)**
+   - Because the backend uses `dockerode` to spawn containers, it **cannot** be deployed to standard serverless platforms or PaaS providers like Heroku. 
+   - It requires a dedicated Linux VM (e.g., **DigitalOcean Droplet, AWS EC2**) with Docker installed.
+   - The Node.js server would run via a process manager like **PM2**, with a reverse proxy like **Nginx** handling SSL and routing traffic to port `3001`.
+
+3. **Scaling & Security Considerations**
+   - **Concurrency:** To support multiple users simultaneously, the backend must be modified to assign dynamic, unique CDP ports for each spawned container, rather than hardcoding port `9222`.
+   - **Resource Management:** Strict idle timeouts must be implemented to kill inactive containers and prevent server memory exhaustion.
