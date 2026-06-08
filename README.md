@@ -11,8 +11,35 @@ A mini TeamViewer for browsers — control a headless Chromium instance inside D
 
 ## Architecture
 
-```
-React UI (canvas) ←─ Socket.IO ──→ Node.js Backend ←─ Puppeteer/CDP ──→ Docker (Chromium)
+```text
+┌─────────────────────────────────────────────┐
+│              USER BROWSER (React UI)        │
+│  ┌──────────────────────────────────────┐   │
+│  │  <canvas> — renders JPEG frames      │   │
+│  │  mouse/keyboard events captured      │   │
+│  └──────────┬───────────────────────────┘   │
+└─────────────┼───────────────────────────────┘
+              │ Socket.IO (WS)
+              ▼
+┌─────────────────────────────────────────────┐
+│         NODE.JS BACKEND (Express)           │
+│  - /api/start → spin up Docker container    │
+│  - /api/stop  → kill Docker container       │
+│  - Socket.IO server:                        │
+│    • receives events (click/scroll/key)     │
+│    • emits screencast frames                │
+│  - Puppeteer connects to container via CDP  │
+└──────────────────────┬──────────────────────┘
+                       │ CDP (port 9222)
+                       ▼
+┌─────────────────────────────────────────────┐
+│         DOCKER CONTAINER                    │
+│  Image: custom (node:20-slim + chromium)    │
+│  - Runs Chromium with --remote-debugging-   │
+│    port=9222 --remote-debugging-address=    │
+│    0.0.0.0                                  │
+│  - Port 9222 mapped to host                 │
+└─────────────────────────────────────────────┘
 ```
 
 | Layer | Tech |
